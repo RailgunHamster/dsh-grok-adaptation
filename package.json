@@ -1,7 +1,7 @@
 {
   "name": "dsh-grok-adaptation",
-  "version": "0.2.0",
-  "description": "Normalize undersized NiuMa Responses images with Sharp while leaving supported large images unchanged.",
+  "version": "0.3.0",
+  "description": "Normalize undersized Grok Responses images with Sharp while leaving supported large images unchanged.",
   "type": "module",
   "main": "lib/index.js",
   "files": [
