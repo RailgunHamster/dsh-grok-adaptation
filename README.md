@@ -13,6 +13,8 @@ The plugin targets:
 - preferred route marker: `x-dsh-niuma-responses-ws: v2`
 - compatibility fallback: a request model starting with `grok-`
 
+The plugin inspects requests on that endpoint. The marker is retained for route identification and compatibility, but image normalization is gated by a `grok-` model prefix, so a marked Gemini, Qwen, or other non-Grok request is still passed through unchanged.
+
 For each `input_image` in a Responses `message` or `function_call_output` item, it asks Sharp/libvips for image metadata. Images with either edge at or below 24px are decoded and rendered onto a 32x32 transparent canvas with nearest-neighbor sampling. The original dimensions and the resulting content dimensions are added as an adjacent text part. This preserves tiny texture pixels while satisfying the upstream image-size boundary without distorting narrow images.
 
 Images with both edges above 24px are sent unchanged. PNG, JPEG, GIF, WebP, TIFF, AVIF, and other formats supported by Sharp are handled through the same code path. If Sharp cannot decode an undersized image, the request remains valid and receives a dimensioned text note instead of an invalid image block.
