@@ -6,3 +6,4 @@
         markerValue: 'v2'
         websocketBeta: 'responses_websockets=2026-02-06'
         websocketBaseURL: 'wss://api.niumacode.cc/v1/responses'
+        autoModelPrefixes: ['grok-']

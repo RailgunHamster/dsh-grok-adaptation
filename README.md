@@ -16,13 +16,14 @@ The plugin keeps the normal DSH `openai-responses` wire adapter. It marks only t
 
 ## Scope
 
-A request is bridged only when all of these match:
+A request is bridged when the hostname and path match, and either the route marker is present or the request model starts with `grok-`:
 
 - hostname: `api.niumacode.cc`
 - path: `/v1/responses`
-- header: `x-dsh-niuma-responses-ws: v2`
+- preferred marker: `x-dsh-niuma-responses-ws: v2`
+- compatibility fallback: `model` prefix `grok-`
 
-Unmarked requests are passed to the original `fetch` unchanged. This keeps the GPT route and the Niuma web-search backend on their existing HTTP/SSE path.
+The model-prefix fallback handles old DSH sessions that still hold a model descriptor from before the route marker was added. Non-Grok requests, including GPT and web-search requests, are passed to the original `fetch` unchanged.
 
 The bridge opens one WebSocket for each Responses request and sends the full DSH request body as `response.create`. It does not keep a connection-scoped `previous_response_id` cache; DSH's existing full-context replay remains the source of truth.
 

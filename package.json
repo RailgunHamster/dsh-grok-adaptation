@@ -1,6 +1,6 @@
 {
   "name": "dsh-niuma-responses-ws",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Route marked NiuMa Responses requests through the Sub2API WebSocket v2 ingress while leaving other DSH traffic unchanged.",
   "type": "module",
   "main": "lib/index.js",
