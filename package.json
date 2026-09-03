@@ -1,0 +1,24 @@
+{
+  "name": "dsh-niuma-responses-ws",
+  "version": "0.1.0",
+  "description": "Route marked NiuMa Responses requests through the Sub2API WebSocket v2 ingress while leaving other DSH traffic unchanged.",
+  "type": "module",
+  "main": "lib/index.js",
+  "files": [
+    "lib",
+    "cordis.patch.yml",
+    "README.md"
+  ],
+  "scripts": {
+    "check": "node --check lib/index.js"
+  },
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    }
+  },
+  "dependencies": {
+    "ws": "^8.21.3"
+  },
+  "license": "MIT"
+}
