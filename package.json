@@ -1,7 +1,7 @@
 {
   "name": "dsh-niuma-responses-ws",
-  "version": "0.1.1",
-  "description": "Route marked NiuMa Responses requests through the Sub2API WebSocket v2 ingress while leaving other DSH traffic unchanged.",
+  "version": "0.2.0",
+  "description": "Normalize undersized NiuMa Responses images with Sharp while leaving supported large images unchanged.",
   "type": "module",
   "main": "lib/index.js",
   "files": [
@@ -18,7 +18,7 @@
     }
   },
   "dependencies": {
-    "ws": "^8.21.3"
+    "sharp": "^0.34.5"
   },
   "license": "MIT"
 }

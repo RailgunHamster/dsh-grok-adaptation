@@ -1,31 +1,23 @@
 # dsh-niuma-responses-ws
 
-A small DeepSeek Harness bundle that routes selected NiuMa/Sub2API Responses requests through the Responses WebSocket v2 ingress.
+A DeepSeek Harness bundle that keeps NiuMa/Sub2API Grok requests on the normal OpenAI Responses HTTP/SSE path and normalizes undersized image inputs before they reach the upstream.
 
-This is useful for NiuMa Grok groups configured like the newer Codex CLI:
+The package name is retained for compatibility with the existing DSH profile installation. It no longer opens a WebSocket connection.
 
-```toml
-wire_api = "responses"
-supports_websockets = true
+## Behavior
 
-[features]
-responses_websockets_v2 = true
-```
-
-The plugin keeps the normal DSH `openai-responses` wire adapter. It marks only the route that should use WebSocket v2, then bridges the WebSocket event stream back to the SSE stream expected by `pi-ai`.
-
-## Scope
-
-A request is bridged when the hostname and path match, and either the route marker is present or the request model starts with `grok-`:
+The plugin targets:
 
 - hostname: `api.niumacode.cc`
 - path: `/v1/responses`
-- preferred marker: `x-dsh-niuma-responses-ws: v2`
-- compatibility fallback: `model` prefix `grok-`
+- preferred route marker: `x-dsh-niuma-responses-ws: v2`
+- compatibility fallback: a request model starting with `grok-`
 
-The model-prefix fallback handles old DSH sessions that still hold a model descriptor from before the route marker was added. Non-Grok requests, including GPT and web-search requests, are passed to the original `fetch` unchanged.
+For each `input_image` in a Responses `message` or `function_call_output` item, it asks Sharp/libvips for image metadata. Images with either edge at or below 24px are decoded and rendered onto a 32x32 transparent canvas with nearest-neighbor sampling. The original dimensions and the resulting content dimensions are added as an adjacent text part. This preserves tiny texture pixels while satisfying the upstream image-size boundary without distorting narrow images.
 
-The bridge opens one WebSocket for each Responses request and sends the full DSH request body as `response.create`. It does not keep a connection-scoped `previous_response_id` cache; DSH's existing full-context replay remains the source of truth.
+Images with both edges above 24px are sent unchanged. PNG, JPEG, GIF, WebP, TIFF, AVIF, and other formats supported by Sharp are handled through the same code path. If Sharp cannot decode an undersized image, the request remains valid and receives a dimensioned text note instead of an invalid image block.
+
+Non-Grok requests, including the normal NiuMa GPT and web-search routes, are passed through unchanged. The wrapper also reconstructs the body when it has inspected a request stream, so non-target requests are not sent with an already-consumed body.
 
 ## Install in DSH
 
@@ -40,12 +32,12 @@ dsh plugin --profile web install
 Restart `dsh-web` after installation and verify:
 
 ```powershell
-dsh --profile web --dump-config | Select-String -Pattern 'niuma-responses-ws|websocketBeta|websocketBaseURL'
+dsh --profile web --dump-config | Select-String -Pattern 'niuma-responses-ws|autoModelPrefixes|sharp'
 ```
 
 ## Route configuration
 
-Add the marker header only to the NiuMa2 route that should use the Sub2API WebSocket ingress:
+Add the marker header only to the NiuMa2 route that should receive the Grok image compatibility handling:
 
 ```yaml
 llm-pi-ai:
@@ -62,14 +54,14 @@ Do not add this header to the normal GPT route or the web-search provider route.
 
 ## Development
 
-The package has no bundled credentials. It uses the `Authorization` header already created by DSH's credential adapter.
+The package has no bundled credentials. It uses the `Authorization` header already created by DSH's credential adapter. Sharp is the only image-processing dependency and ships platform binaries through its normal package distribution.
 
 ```powershell
 pnpm install
 pnpm run check
 ```
 
-The acceptance test used during development exercised `grok-4.6` with `reasoning=max`, `max_output_tokens=131072`, a tool call, tool-result replay, and a final answer through the WebSocket v2 bridge. No API key or session data is stored in this repository.
+The acceptance tests exercised `grok-4.6` through Responses HTTP with current-turn and tool-result image inputs, including PNG, JPEG, GIF, WebP, 1x16, 16x26, 16x32, and 16x16 cases. Undersized inputs were normalized to a 32x32 canvas and the resulting requests completed successfully. No API key or session data is stored in this repository.
 
 ## License
 
