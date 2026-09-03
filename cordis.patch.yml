@@ -1,8 +1,8 @@
 - insert:
-    - id: niuma-responses-ws
-      name: 'dsh-niuma-responses-ws'
+    - id: grok-adaptation
+      name: 'dsh-grok-adaptation'
       config:
-        markerHeader: 'x-dsh-niuma-responses-ws'
+        markerHeader: 'x-dsh-grok-adaptation'
         markerValue: 'v2'
         autoModelPrefixes: ['grok-']
         debug: true

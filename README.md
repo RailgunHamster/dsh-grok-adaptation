@@ -1,45 +1,65 @@
-# dsh-niuma-responses-ws
+# dsh-grok-adaptation
 
-A DeepSeek Harness bundle that keeps NiuMa/Sub2API Grok requests on the normal OpenAI Responses HTTP/SSE path and normalizes undersized image inputs before they reach the upstream.
+DeepSeek Harness adaptation for Grok image inputs through the NiuMa/Sub2API OpenAI Responses endpoint.
 
-The package name is retained for compatibility with the existing DSH profile installation. It no longer opens a WebSocket connection.
+通过 NiuMa/Sub2API 的 OpenAI Responses 接口，为 DeepSeek Harness 的 Grok 图片输入提供兼容处理。
 
-## Behavior
+## What it does / 功能
 
-The plugin targets:
+The plugin keeps Grok requests on the normal Responses HTTP/SSE path. It does not open or require a WebSocket connection.
 
-- hostname: `api.niumacode.cc`
-- path: `/v1/responses`
-- preferred route marker: `x-dsh-niuma-responses-ws: v2`
-- compatibility fallback: a request model starting with `grok-`
+插件让 Grok 请求继续使用标准 Responses HTTP/SSE，不打开也不依赖 WebSocket。
 
-The plugin inspects requests on that endpoint. The marker is retained for route identification and compatibility, but image normalization is gated by a `grok-` model prefix, so a marked Gemini, Qwen, or other non-Grok request is still passed through unchanged.
+For every `input_image` in a Responses `message` or `function_call_output` item, the plugin reads image metadata with Sharp/libvips. If either image edge is 24 pixels or smaller, it:
 
-For each `input_image` in a Responses `message` or `function_call_output` item, it asks Sharp/libvips for image metadata. Images with either edge at or below 24px are decoded and rendered onto a 32x32 transparent canvas with nearest-neighbor sampling. The original dimensions and the resulting content dimensions are added as an adjacent text part. This preserves tiny texture pixels while satisfying the upstream image-size boundary without distorting narrow images.
+对于 Responses `message` 或 `function_call_output` 中的每个 `input_image`，插件使用 Sharp/libvips 读取图片信息。如果图片任意一边不超过 24 像素，插件会：
 
-Images with both edges above 24px are sent unchanged. PNG, JPEG, GIF, WebP, TIFF, AVIF, and other formats supported by Sharp are handled through the same code path. If Sharp cannot decode an undersized image, the request remains valid and receives a dimensioned text note instead of an invalid image block.
+1. Decode the original image with nearest-neighbor processing. / 使用最近邻方式解码原图。
+2. Resize the actual pixels proportionally onto a 32x32 transparent canvas. / 按比例把真实像素放大到 32x32 透明画布中。
+3. Add a text note containing the original dimensions and the resulting content dimensions. / 添加包含原图尺寸和实际内容尺寸的文字备注。
 
-Non-Grok requests, including the normal NiuMa GPT and web-search routes, are passed through unchanged. The wrapper also reconstructs the body when it has inspected a request stream, so non-target requests are not sent with an already-consumed body.
+Square images fill the canvas. Narrow or rectangular images keep their aspect ratio and receive transparent padding instead of being stretched. Images whose width and height are both greater than 24 pixels are sent unchanged.
 
-## Install in DSH
+正方形图片会填满画布。窄图或矩形图保持原始比例，使用透明留白，不会被强行拉伸。宽度和高度都大于 24 像素的图片原样发送。
 
-After publishing this repository, install it into the web profile using the current DSH plugin command:
+Sharp provides one mature decoding path for PNG, JPEG, GIF, WebP, TIFF, AVIF, and other supported formats. The plugin does not maintain separate handwritten image decoders.
+
+Sharp 为 PNG、JPEG、GIF、WebP、TIFF、AVIF 以及其他支持的格式提供统一且成熟的解码路径。插件不再维护手写的格式专用解码器。
+
+## Scope / 作用范围
+
+Image normalization is enabled only when all of the following are true:
+
+只有以下条件同时满足时才会进行图片规范化：
+
+- Hostname / 主机名: `api.niumacode.cc`
+- Endpoint / 接口: `/v1/responses`
+- Model / 模型: starts with `grok-`
+
+The route marker is `x-dsh-grok-adaptation: v2`. It identifies the configured NiuMa2 route, but the model-prefix check remains mandatory. Gemini, Qwen, GPT, web-search, and other non-Grok requests are forwarded unchanged, even if they carry the marker.
+
+路由标记是 `x-dsh-grok-adaptation: v2`。它用于识别配置好的 NiuMa2 路由，但实际模型前缀检查仍然是必需条件。即使 Gemini、Qwen、GPT、web search 或其他非 Grok 请求带有该标记，也会原样转发，不会被修改。
+
+## Install / 安装
+
+Install the package into the DSH web profile:
+
+将插件安装到 DSH web profile：
 
 ```powershell
-dsh plugin --profile web add https://github.com/<owner>/dsh-niuma-responses-ws
-# Use the exact source URL shown by the current `dsh plugin --help` if the CLI requires an archive URL.
+dsh plugin --profile web add https://github.com/RailgunHamster/dsh-grok-adaptation.git
 dsh plugin --profile web install
 ```
 
-Restart `dsh-web` after installation and verify:
+Restart `dsh-web` after installation. The package includes Sharp and its platform binary dependencies.
 
-```powershell
-dsh --profile web --dump-config | Select-String -Pattern 'niuma-responses-ws|autoModelPrefixes|sharp'
-```
+安装后重启 `dsh-web`。插件依赖中包含 Sharp 及其对应平台的二进制依赖。
 
-## Route configuration
+## Route configuration / 路由配置
 
-Add the marker header only to the NiuMa2 route that should receive the Grok image compatibility handling:
+Add the marker only to the Grok route:
+
+只给 Grok 路由添加标记：
 
 ```yaml
 llm-pi-ai:
@@ -49,22 +69,28 @@ llm-pi-ai:
       baseURL: https://api.niumacode.cc/v1
       apiKeyEnv: NIUMACODE2_API_KEY
       headers:
-        x-dsh-niuma-responses-ws: v2
+        x-dsh-grok-adaptation: v2
 ```
 
-Do not add this header to the normal GPT route or the web-search provider route.
+Do not add this marker to the normal GPT or web-search provider routes.
 
-## Development
+不要给普通 GPT 或 web-search provider 路由添加这个标记。
 
-The package has no bundled credentials. It uses the `Authorization` header already created by DSH's credential adapter. Sharp is the only image-processing dependency and ships platform binaries through its normal package distribution.
+## Development / 开发
+
+The package contains no credentials. It uses the `Authorization` header already created by DSH.
+
+插件不包含任何凭据，使用 DSH 已经生成的 `Authorization` 请求头。
 
 ```powershell
 pnpm install
 pnpm run check
 ```
 
-The acceptance tests exercised `grok-4.6` through Responses HTTP with current-turn and tool-result image inputs, including PNG, JPEG, GIF, WebP, 1x16, 16x26, 16x32, and 16x16 cases. Undersized inputs were normalized to a 32x32 canvas and the resulting requests completed successfully. No API key or session data is stored in this repository.
+The tested cases include Grok 4.6 Responses requests with current-turn images and tool-result image replays, using PNG, JPEG, GIF, WebP, 1x16, 16x26, 16x32, and 16x16 inputs. Undersized images were normalized and the resulting requests completed successfully.
 
-## License
+已测试 Grok 4.6 Responses 请求，包括当前轮图片和工具结果图片回放，覆盖 PNG、JPEG、GIF、WebP、1x16、16x26、16x32 和 16x16 图片。小图经过规范化后，请求成功完成。
+
+## License / 许可证
 
 MIT

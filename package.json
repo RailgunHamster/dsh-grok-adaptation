@@ -1,5 +1,5 @@
 {
-  "name": "dsh-niuma-responses-ws",
+  "name": "dsh-grok-adaptation",
   "version": "0.2.0",
   "description": "Normalize undersized NiuMa Responses images with Sharp while leaving supported large images unchanged.",
   "type": "module",
